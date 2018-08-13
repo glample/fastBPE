@@ -43,8 +43,8 @@ applybpe output input codes [vocab]  apply BPE codes to a text file
 
 ### Apply codes to valid and test
 ```
-./fast applybpe valid.de.40000 valid.de codes vocab.de.40000 > valid.de.40000
-./fast applybpe valid.en.40000 valid.en codes vocab.en.40000 > valid.en.40000
-./fast applybpe test.de.40000  test.de  codes vocab.de.40000 > test.de.40000
-./fast applybpe test.en.40000  test.en  codes vocab.en.40000 > test.en.40000
+./fast applybpe valid.de.40000 valid.de codes vocab.de.40000
+./fast applybpe valid.en.40000 valid.en codes vocab.en.40000
+./fast applybpe test.de.40000  test.de  codes vocab.de.40000
+./fast applybpe test.en.40000  test.en  codes vocab.en.40000
 ```
