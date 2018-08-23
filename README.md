@@ -1,3 +1,4 @@
+
 # fastBPE
 
 C++ implementation of [Neural Machine Translation of Rare Words with Subword Units](https://arxiv.org/abs/1508.07909).
@@ -23,6 +24,13 @@ getvocab input1 [input2]             extract the vocabulary from one or two text
 learnbpe nCodes input1 [input2]      learn BPE codes from one or two text files
 applybpe output input codes [vocab]  apply BPE codes to a text file
 ```
+
+fastBPE also supports stdin inputs for `getvocab` and `learnbpe`. For instance, these two commands are equivalent:
+```
+./fast getvocab text > vocab
+cat text | ./fast getvocab - > vocab
+```
+But the first one will memory map the input file to read it efficiently, which can be more than twice faster than stdin on very large files.
 
 ### Learn codes
 ```
