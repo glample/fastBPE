@@ -48,21 +48,12 @@ int safeOpen(const char *file_path, int flags, mode_t mode = 0) {
 }
 
 void readText(const char *fp, unordered_map<string, uint32_t> &word_count) {
-  int fd = safeOpen(fp, O_RDONLY);
-
-  struct stat s;
-  int status = fstat(fd, &s);
-  fprintf(stderr, "Loading vocabulary from %s ...\n", fp);
-
-  auto size = s.st_size;
-  char *f = (char *)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
   string cur_word;
   uint64_t total = 0;
-  for (size_t i = 0; i < size; i++) {
-    auto &cur_char = f[i];
+  auto deal_with_char = [&](char cur_char){
     if (cur_char == ' ' || cur_char == '\n') {
       if (cur_word.size() == 0)
-        continue;
+        return;
       // end of word
       auto it = word_count.find(cur_word);
       int count = it != word_count.end() ? it->second : 0;
@@ -71,6 +62,29 @@ void readText(const char *fp, unordered_map<string, uint32_t> &word_count) {
       cur_word.clear();
     } else {
       cur_word.push_back(cur_char);
+    }
+  };
+
+  if (string(fp).compare("-") == 0) {
+    for (std::string line; std::getline(std::cin, line);) {
+      for(char c: line){
+        deal_with_char(c);
+      }
+      deal_with_char('\n');
+    }
+  }
+  else {
+    int fd = safeOpen(fp, O_RDONLY);
+
+    struct stat s;
+    int status = fstat(fd, &s);
+    fprintf(stderr, "Loading vocabulary from %s ...\n", fp);
+
+    auto size = s.st_size;
+    char *f = (char *)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+
+    for (size_t i = 0; i < size; i++) {
+      deal_with_char(f[i]);
     }
   }
   fprintf(stderr, "Read %lu words (%lu unique) from text file.\n", total,
@@ -384,7 +398,9 @@ void learnbpe(const uint32_t kNPairs, const char *inputFile1,
       }
     }
 
-    pair_counts[max_p]->first = 0;
+    if (pair_counts.find(max_p) != pair_counts.end()){
+      pair_counts[max_p]->first = 0;
+    }
     find_maxp(contiguous_counts, max_p, max_c);
   }
 }
