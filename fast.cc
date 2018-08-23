@@ -91,6 +91,39 @@ void readText(const char *fp, unordered_map<string, uint32_t> &word_count) {
           word_count.size());
 }
 
+std::pair<size_t, uint64_t> output_or_count(
+  unordered_map<string, string> &bpe, size_t size, char *f, char *fo
+) {
+  string cur_word;
+  size_t charOut = 0;
+  uint64_t total = 0;
+  for (size_t i = 0; i < size; i++) {
+    auto &cur_char = f[i];
+    if (cur_char == ' ' || cur_char == '\n') {
+      if (cur_word.size() == 0) {
+        if (fo != nullptr) fo[charOut] = cur_char;
+        charOut++;
+        continue;
+      }
+      // end of word : write bpe to output
+      auto it = bpe.find(cur_word);
+      assert(it != bpe.end());
+      for (auto x : it->second) {
+        if (fo != nullptr) fo[charOut] = x;
+        charOut++;
+      }
+      if (fo != nullptr) fo[charOut] = cur_char;
+      charOut++;
+
+      total++;
+      cur_word.clear();
+    } else {
+      cur_word.push_back(cur_char);
+    }
+  }
+  return std::make_pair(charOut, total);
+}
+
 void outputText(const char *fpo, const char *fp,
                 unordered_map<string, string> &bpe) {
 
@@ -102,52 +135,27 @@ void outputText(const char *fpo, const char *fp,
 
   fprintf(stderr, "Applying BPE to %s ...\n", fp);
   auto size = s.st_size;
-  size_t out_size = size * 1.3;
-  // resize output to 1.3 * input size. should be enough
+  char *f = (char *)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+
+  auto p = output_or_count(bpe, size, f, nullptr);
+  size_t out_size = p.first;
+
   if (ftruncate(fdOut, out_size) < 0) {
     fprintf(stderr, "Couldn't truncate output file %s to size %lu\n", fpo,
             out_size);
     exit(EXIT_FAILURE);
   }
 
-  char *f = (char *)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+
   char *fo = (char *)mmap(NULL, out_size, PROT_WRITE, MAP_SHARED, fdOut, 0);
   if (fo == MAP_FAILED) {
     fprintf(stderr, "Output memory map failed : %d.\n", errno);
     exit(EXIT_FAILURE);
   }
-  string cur_word;
-  uint64_t total = 0;
-  size_t charOut = 0;
-  for (size_t i = 0; i < size; i++) {
-    auto &cur_char = f[i];
-    if (cur_char == ' ' || cur_char == '\n') {
-      if (cur_word.size() == 0) {
-        fo[charOut] = cur_char;
-        charOut++;
-        continue;
-      }
-      // end of word : write bpe to output
-      auto it = bpe.find(cur_word);
-      assert(it != bpe.end());
-      for (auto x : it->second) {
-        fo[charOut] = x;
-        charOut++;
-      }
-      fo[charOut] = cur_char;
-      charOut++;
-
-      total++;
-      cur_word.clear();
-    } else {
-      cur_word.push_back(cur_char);
-    }
-  }
-  fprintf(stderr, "Modified %lu words from text file.\n", total);
+  p = output_or_count(bpe, size, f, fo);
+  fprintf(stderr, "Modified %lu words from text file.\n", p.second);
   munmap(fo, out_size);
-  if (ftruncate(fdOut, charOut) < 0) {
-    cerr << "Output failure" << endl;
-  }
+  munmap(f, size);
   close(fdOut);
   close(fd);
 }
