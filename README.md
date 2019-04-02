@@ -23,14 +23,22 @@ The commands supported by fastBPE are:
 getvocab input1 [input2]             extract the vocabulary from one or two text files
 learnbpe nCodes input1 [input2]      learn BPE codes from one or two text files
 applybpe output input codes [vocab]  apply BPE codes to a text file
+applybpe_stream codes [vocab]        apply BPE codes to stdin and outputs to stdout
 ```
 
-fastBPE also supports stdin inputs for `getvocab` and `learnbpe`. For instance, these two commands are equivalent:
+fastBPE also supports stdin inputs. For instance, these two commands are equivalent:
 ```
 ./fast getvocab text > vocab
 cat text | ./fast getvocab - > vocab
 ```
 But the first one will memory map the input file to read it efficiently, which can be more than twice faster than stdin on very large files.
+
+Similarly, these two commands are equivalent:
+```
+./fast applybpe output input codes vocab
+cat input | ./fast applybpe_stream codes vocab > output
+```
+But the first one will be significantly faster on large datasets, as it uses multi-threading to pre-compute the BPE splits of all words in the input file.
 
 ### Learn codes
 ```

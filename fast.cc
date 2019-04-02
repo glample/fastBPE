@@ -35,6 +35,7 @@ void printUsage() {
       << "learnbpe nCodes input1 [input2]      learn BPE codes from one or two "
          "text files\n"
       << "applybpe output input codes [vocab]  apply BPE codes to a text file\n"
+      << "applybpe_stream codes [vocab]        apply BPE codes to stdin and output to stdout\n"
       << endl;
 }
 
@@ -579,9 +580,9 @@ string process_bpe(vector<string> &subwords,
     result = result + x + kTokenDelim + " ";
   }
   return result.substr(
-      0,
-      result.size() - kEndWordLength - kTokenDelimLength - 1 // "</w>@@ "
-      );
+    0,
+    result.size() - kEndWordLength - kTokenDelimLength - 1 // "</w>@@ "
+  );
 }
 
 void applybpe(const char *outputFile, const char *inputFile,
@@ -615,14 +616,14 @@ void applybpe(const char *outputFile, const char *inputFile,
   vector<thread> threads;
   for (size_t i = 0; i < kThreads; i++) {
     threads.emplace_back(
-        [&](size_t this_thread) {
-          for (size_t w = this_thread; w < bpeTokVec.size(); w += kThreads) {
-            auto &x = bpeTokVec[w];
-            bpe[this_thread][x.first] =
-                process_bpe(x.second, codes, reversed_codes, vocab);
-          }
-        },
-        i);
+      [&](size_t this_thread) {
+        for (size_t w = this_thread; w < bpeTokVec.size(); w += kThreads) {
+          auto &x = bpeTokVec[w];
+          bpe[this_thread][x.first] = process_bpe(x.second, codes, reversed_codes, vocab);
+        }
+      },
+      i
+    );
   }
 
   unordered_map<string, string> final_bpe;
@@ -634,6 +635,61 @@ void applybpe(const char *outputFile, const char *inputFile,
   }
   // output
   outputText(outputFile, inputFile, final_bpe);
+}
+
+void applybpe_stream(const char *codesPath, const char *vocabPath) {
+  // read vocabulary (to which we want to limit the output file)
+  unordered_map<string, uint32_t> vocab;
+  if (vocabPath != "") {
+    readVocab(vocabPath, vocab);
+  }
+
+  // read codes
+  unordered_map<tps, uint32_t, pair_hash> codes;
+  unordered_map<string, tps> reversed_codes;
+  readCodes(codesPath, codes, reversed_codes);
+
+  // for each line
+  std::string line;
+  while(std::getline(std::cin, line)) {
+
+    // split into words
+    vector<string> words;
+    split(words, line, ' ');
+
+    // for each word
+    for (size_t i = 0; i < words.size(); i++) {
+
+      auto word = words[i];
+      vector<string> word_bpes;
+      int pos = 0, realLength = 0;
+      int lastStart = 0;
+
+      // split into characters
+      while (word[pos]) {
+        bool newChar = (word[pos] & 0xc0) != 0x80; // not a continuation byte
+        realLength += newChar;
+        // new token
+        if (newChar && pos > 0) {
+          auto new_token = word.substr(lastStart, pos - lastStart);
+          word_bpes.push_back(new_token);
+          lastStart = pos;
+        }
+        pos++;
+      }
+
+      // compute BPEs
+      auto bpe = word.substr(lastStart, string::npos) + kEndWord;
+      word_bpes.push_back(bpe);
+      std::cout << process_bpe(word_bpes, codes, reversed_codes, vocab);
+
+      // end of line / end of word
+      if (i == words.size() - 1)
+        std::cout << std::endl;
+      else
+        std::cout << ' ';
+    }
+  }
 }
 
 int main(int argc, char **argv) {
@@ -651,6 +707,9 @@ int main(int argc, char **argv) {
   } else if (command == "applybpe") {
     assert(argc == 5 || argc == 6);
     applybpe(argv[2], argv[3], argv[4], argc == 6 ? argv[5] : "");
+  } else if (command == "applybpe_stream") {
+    assert(argc == 3 || argc == 4);
+    applybpe_stream(argv[2], argc == 4 ? argv[3] : "");
   } else {
     printUsage();
     exit(EXIT_FAILURE);
