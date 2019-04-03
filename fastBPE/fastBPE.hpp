@@ -1,3 +1,5 @@
+#pragma once
+
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
@@ -9,6 +11,7 @@
 #include <set>
 #include <stdio.h>
 #include <string>
+#include <cstring>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <thread>
@@ -16,6 +19,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+
+namespace fastBPE {
 
 using namespace std;
 
@@ -25,19 +31,6 @@ const char *kEndWord = "</w>";
 const size_t kEndWordLength = 4;
 const char *kTokenDelim = "@@";
 const size_t kTokenDelimLength = 2;
-
-void printUsage() {
-  cerr
-      << "usage: fastbpe <command> <args>\n\n"
-      << "The commands supported by fastBPE are:\n\n"
-      << "getvocab input1 [input2]             extract the vocabulary from one "
-         "or two text files\n"
-      << "learnbpe nCodes input1 [input2]      learn BPE codes from one or two "
-         "text files\n"
-      << "applybpe output input codes [vocab]  apply BPE codes to a text file\n"
-      << "applybpe_stream codes [vocab]        apply BPE codes to stdin and output to stdout\n"
-      << endl;
-}
 
 int safeOpen(const char *file_path, int flags, mode_t mode = 0) {
   int fd = open(file_path, flags, mode);
@@ -78,10 +71,10 @@ void readText(const char *fp, unordered_map<string, uint32_t> &word_count) {
     int fd = safeOpen(fp, O_RDONLY);
 
     struct stat s;
-    int status = fstat(fd, &s);
+    fstat(fd, &s);
     fprintf(stderr, "Loading vocabulary from %s ...\n", fp);
 
-    auto size = s.st_size;
+    size_t size = s.st_size;
     char *f = (char *)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
 
     for (size_t i = 0; i < size; i++) {
@@ -132,7 +125,7 @@ void outputText(const char *fpo, const char *fp,
   auto fdOut = safeOpen(fpo, O_RDWR | O_CREAT | O_TRUNC, 0666);
 
   struct stat s;
-  int status = fstat(fd, &s);
+  fstat(fd, &s);
 
   fprintf(stderr, "Applying BPE to %s ...\n", fp);
   auto size = s.st_size;
@@ -271,7 +264,7 @@ void count_in_word(
 }
 
 void find_maxp(vector<pair<int32_t, tp>> &contiguous_counts, tp &maxp,
-               uint32_t &max_c) {
+               int32_t &max_c) {
   max_c = 0;
   for (auto &x : contiguous_counts) {
     if (x.first > max_c) {
@@ -287,7 +280,7 @@ void getvocab(const char *inputFile1, const char *inputFile2) {
   // get vocab
   unordered_map<string, uint32_t> word_count;
   readText(inputFile1, word_count);
-  if (inputFile2 != "") {
+  if (strcmp(inputFile2, "") != 0) {
     readText(inputFile2, word_count);
   }
 
@@ -310,7 +303,7 @@ void learnbpe(const uint32_t kNPairs, const char *inputFile1,
   // get vocab
   unordered_map<string, uint32_t> word_count;
   readText(inputFile1, word_count);
-  if (inputFile2 != "") {
+  if (strcmp(inputFile2, "") != 0) {
     readText(inputFile2, word_count);
   }
 
@@ -330,14 +323,14 @@ void learnbpe(const uint32_t kNPairs, const char *inputFile1,
   unordered_map<tp, unordered_set<uint32_t>, pair_hash> where_to_update;
 
   tp cur_pair;
-  uint32_t max_c = 0;
+  int32_t max_c = 0;
   tp max_p;
   for (uint32_t wi = 0; wi < words.size(); wi++) {
     count_in_word(words[wi], wi, counts[wi], pair_counts, contiguous_counts,
                   where_to_update);
   }
   find_maxp(contiguous_counts, max_p, max_c);
-  for (int i = 0; i < kNPairs; i++) {
+  for (size_t i = 0; i < kNPairs; i++) {
     // create new token for pair. replace
     auto new_token = int_to_token[max_p.first] + int_to_token[max_p.second];
     cout << int_to_token[max_p.first] << " " << int_to_token[max_p.second]
@@ -479,7 +472,7 @@ void decompose(const string s, vector<string> &newSubwords,
     // if we cannot un-merge a subword, it has to be a char
     string s2 = isFinal ? s.substr(0, s.size() - kEndWordLength) : s;
     int count = 0;
-    for (int j = 0; j < s2.size(); j++) {
+    for (size_t j = 0; j < s2.size(); j++) {
       if ((s2[j] & 0xc0) != 0x80) {
         count++;
       }
@@ -511,7 +504,7 @@ void limitVocab(const vector<string> &subwords, vector<string> &newSubwords,
                 const unordered_map<string, tps> &reversed_codes,
                 const unordered_map<string, uint32_t> &vocab) {
   string query;
-  for (int i = 0; i < subwords.size(); i++) {
+  for (size_t i = 0; i < subwords.size(); i++) {
     bool isFinal = i == subwords.size() - 1;
     auto &subword = subwords[i];
     if (isFinal) {
@@ -537,11 +530,11 @@ string process_bpe(vector<string> &subwords,
     // find the best pair
     int bestPairId = -1;
     auto bestPair = codes.end(); // TODO ugly hack that works
-    for (int i = 0; i < subwords.size() - 1; i++) {
+    for (size_t i = 0; i < subwords.size() - 1; i++) {
       auto pair = make_pair(subwords[i], subwords[i + 1]);
       auto it = codes.find(pair);
       int pairRank = it == codes.end() ? -1 : it->second;
-      if (pairRank >= 0 && (bestPairId == -1 || bestPair->second > pairRank)) {
+      if (pairRank >= 0 && (bestPairId == -1 || int(bestPair->second) > pairRank)) {
         bestPair = it;
         bestPairId = i;
       }
@@ -553,7 +546,7 @@ string process_bpe(vector<string> &subwords,
     // otherwise, merge subWords
     bool justMerged = false;
     newSubwords = vector<string>();
-    for (int i = 0; i < subwords.size(); i++) {
+    for (size_t i = 0; i < subwords.size(); i++) {
       if ((i + 1 < subwords.size()) && (not justMerged) &&
           subwords[i] == bestPair->first.first &&
           subwords[i + 1] == bestPair->first.second) {
@@ -589,7 +582,7 @@ void applybpe(const char *outputFile, const char *inputFile,
               const char *codesPath, const char *vocabPath) {
   // read vocabulary (to which we want to limit the output file)
   unordered_map<string, uint32_t> vocab;
-  if (vocabPath != "") {
+  if (strcmp(vocabPath, "") != 0) {
     readVocab(vocabPath, vocab);
   }
 
@@ -637,82 +630,63 @@ void applybpe(const char *outputFile, const char *inputFile,
   outputText(outputFile, inputFile, final_bpe);
 }
 
-void applybpe_stream(const char *codesPath, const char *vocabPath) {
-  // read vocabulary (to which we want to limit the output file)
-  unordered_map<string, uint32_t> vocab;
-  if (vocabPath != "") {
-    readVocab(vocabPath, vocab);
-  }
 
-  // read codes
+class BPEApplyer {
+private:
+  unordered_map<string, uint32_t> vocab;
   unordered_map<tps, uint32_t, pair_hash> codes;
   unordered_map<string, tps> reversed_codes;
-  readCodes(codesPath, codes, reversed_codes);
 
-  // for each line
+public:
+  BPEApplyer(const string& codesPath, const string& vocabPath) {
+    if (vocabPath.size() > 0) readVocab(vocabPath.c_str(), vocab);
+    readCodes(codesPath.c_str(), codes, reversed_codes);
+  }
+
+  vector<string> apply(vector<string>& sentences) {
+    vector<string> res;
+    for(auto &s: sentences) {
+      res.emplace_back("");
+      string& cur = res.back();
+      vector<string> words;
+      split(words, s, ' ');
+      for (size_t i = 0; i < words.size(); i++) {
+        auto word = words[i];
+        vector<string> word_bpes;
+        int pos = 0, realLength = 0;
+        int lastStart = 0;
+        while (word[pos]) {
+          bool newChar = (word[pos] & 0xc0) != 0x80; // not a continuation byte
+          realLength += newChar;
+          if (newChar && pos > 0) {
+            auto new_token = word.substr(lastStart, pos - lastStart);
+            word_bpes.push_back(new_token);
+            lastStart = pos;
+          }
+          pos++;
+        }
+        auto bpe = word.substr(lastStart, string::npos) + kEndWord;
+        word_bpes.push_back(bpe);
+        cur += process_bpe(word_bpes, codes, reversed_codes, vocab);
+        if (i < words.size() - 1) cur += " ";
+      }
+    }
+    return res;
+  }
+
+};
+
+
+void applybpe_stream(const char *codesPath, const char *vocabPath) {
+  BPEApplyer applyer(codesPath, vocabPath);
   std::string line;
   while(std::getline(std::cin, line)) {
-
-    // split into words
-    vector<string> words;
-    split(words, line, ' ');
-
-    // for each word
-    for (size_t i = 0; i < words.size(); i++) {
-
-      auto word = words[i];
-      vector<string> word_bpes;
-      int pos = 0, realLength = 0;
-      int lastStart = 0;
-
-      // split into characters
-      while (word[pos]) {
-        bool newChar = (word[pos] & 0xc0) != 0x80; // not a continuation byte
-        realLength += newChar;
-        // new token
-        if (newChar && pos > 0) {
-          auto new_token = word.substr(lastStart, pos - lastStart);
-          word_bpes.push_back(new_token);
-          lastStart = pos;
-        }
-        pos++;
-      }
-
-      // compute BPEs
-      auto bpe = word.substr(lastStart, string::npos) + kEndWord;
-      word_bpes.push_back(bpe);
-      std::cout << process_bpe(word_bpes, codes, reversed_codes, vocab);
-
-      // end of line / end of word
-      if (i == words.size() - 1)
-        std::cout << std::endl;
-      else
-        std::cout << ' ';
+    vector<string> tmp;
+    tmp.push_back(line);
+    for(auto& l : applyer.apply(tmp)){
+      std::cout << l << std::endl;
     }
   }
 }
 
-int main(int argc, char **argv) {
-  if (argc < 2) {
-    printUsage();
-    exit(EXIT_FAILURE);
-  }
-  string command = argv[1];
-  if (command == "getvocab") {
-    assert(argc == 3 || argc == 4);
-    getvocab(argv[2], argc == 4 ? argv[3] : "");
-  } else if (command == "learnbpe") {
-    assert(argc == 4 || argc == 5);
-    learnbpe(stoi(argv[2]), argv[3], argc == 5 ? argv[4] : "");
-  } else if (command == "applybpe") {
-    assert(argc == 5 || argc == 6);
-    applybpe(argv[2], argv[3], argv[4], argc == 6 ? argv[5] : "");
-  } else if (command == "applybpe_stream") {
-    assert(argc == 3 || argc == 4);
-    applybpe_stream(argv[2], argc == 4 ? argv[3] : "");
-  } else {
-    printUsage();
-    exit(EXIT_FAILURE);
-  }
-  return 0;
-}
+};
