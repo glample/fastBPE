@@ -1,7 +1,7 @@
 
 # fastBPE
 
-C++ implementation of [Neural Machine Translation of Rare Words with Subword Units](https://arxiv.org/abs/1508.07909).
+C++ implementation of [Neural Machine Translation of Rare Words with Subword Units](https://arxiv.org/abs/1508.07909), with Python API.
 
 ## Installation
 
@@ -9,7 +9,6 @@ Compile with:
 ```
 g++ -std=c++11 -pthread -O3 fastBPE/main.cc -IfastBPE -o fast
 ```
-
 
 ## Usage:
 
@@ -31,14 +30,12 @@ fastBPE also supports stdin inputs. For instance, these two commands are equival
 ./fast getvocab text > vocab
 cat text | ./fast getvocab - > vocab
 ```
-But the first one will memory map the input file to read it efficiently, which can be more than twice faster than stdin on very large files.
-
-Similarly, these two commands are equivalent:
+But the first one will memory map the input file to read it efficiently, which can be more than twice faster than stdin on very large files. Similarly, these two commands are equivalent:
 ```
 ./fast applybpe output input codes vocab
 cat input | ./fast applybpe_stream codes vocab > output
 ```
-But the first one will be significantly faster on large datasets, as it uses multi-threading to pre-compute the BPE splits of all words in the input file.
+Although the first one will be significantly faster on large datasets, as it uses multi-threading to pre-compute the BPE splits of all words in the input file.
 
 ### Learn codes
 ```
@@ -63,4 +60,22 @@ But the first one will be significantly faster on large datasets, as it uses mul
 ./fast applybpe valid.en.40000 valid.en codes vocab.en.40000
 ./fast applybpe test.de.40000  test.de  codes vocab.de.40000
 ./fast applybpe test.en.40000  test.en  codes vocab.en.40000
+```
+
+## Python API
+
+To install the Python API, simply run:
+```
+python setup.py install
+```
+
+Call the API using:
+
+```python
+import fastBPE
+
+bpe = fastBPE.fastBPE(codes_path, vocab_path)
+bpe.apply(["Roasted barramundi fish", "Centrally managed over a client-server architecture"])
+
+>> ['Ro@@ asted barr@@ am@@ un@@ di fish', 'Centr@@ ally managed over a cli@@ ent-@@ server architecture']
 ```
