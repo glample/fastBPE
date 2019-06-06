@@ -14,7 +14,7 @@ cdef class fastBPE:
     def __dealloc__(self):
         del self.c_obj
 
-    def __init__(self, codes_path, vocab_path):
+    def __init__(self, codes_path, vocab_path=""):
         self.c_obj = new BPEApplyer(codes_path.encode(), vocab_path.encode())
 
     def apply(self, sentences):
