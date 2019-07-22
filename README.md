@@ -65,9 +65,11 @@ Although the first one will be significantly faster on large datasets, as it use
 ## Python API
 
 To install the Python API, simply run:
-```
+```bash
 python setup.py install
 ```
+
+**Note:** For Mac OSX Users, add `export MACOSX_DEPLOYMENT_TARGET=10.x` (x=9 or 10, depending on your version) or `-stdlib=libc++` to the `extra_compile_args` of `setup.py` before/during the above install command, as appropriate.
 
 Call the API using:
 
