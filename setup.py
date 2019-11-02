@@ -36,7 +36,7 @@ with open('README.md') as f:
 
 setup(
     name = 'fastBPE',
-    version = '0.1.0',
+    version = '0.1.1',
     description = 'C++ implementation of Neural Machine Translation of Rare Words with Subword Units, with Python API.',
     url = 'https://github.com/glample/fastBPE',
     long_description = readme,
