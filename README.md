@@ -73,6 +73,11 @@ python setup.py install
 
 Call the API using:
 
+Cython is a dependency which can be installed using
+```
+pip install cython
+```
+
 ```python
 import fastBPE
 
