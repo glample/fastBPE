@@ -7,7 +7,7 @@ C++ implementation of [Neural Machine Translation of Rare Words with Subword Uni
 
 Compile with:
 ```
-g++ -std=c++11 -pthread -O3 fastBPE/main.cc -IfastBPE -o fast
+g++ -std=c++11 -pthread -O3 fastBPE/fastBPE.cpp -IfastBPE -o fast
 ```
 
 ## Usage:
